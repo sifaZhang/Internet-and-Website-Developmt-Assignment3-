@@ -4,10 +4,17 @@ let seconds = 60;
 let typesOfTrash = 3;
 let drawTimer, waveTimer, timeTimer;
 
+//background music
+let bgMusic = new Audio("./assets/audio/bg-music.mp3");
+
 function startGame() {
-  drawTimer = setInterval(draw, 200);
-  waveTimer = setInterval(updateWave, 400);
-  timeTimer = setInterval(decreaseTime, 1000);
+    drawTimer = setInterval(draw, 200);
+    waveTimer = setInterval(updateWave, 400);
+    timeTimer = setInterval(decreaseTime, 1000);
+
+    bgMusic.loop = true;
+    bgMusic.volume = 0.5;
+    bgMusic.play();
 }
 
 function start() {
@@ -38,6 +45,7 @@ ctx.scale(scale, scale);
 
 let balls = [];
 let score = 0;
+//background img
 let waveUp = true;
 let bgLoaded = false;
 const bg1 = new Image();
@@ -199,13 +207,20 @@ function drawCanvas()
     }
 }
 
+function stopGame() {
+    clearInterval(drawTimer);
+    clearInterval(waveTimer);
+    clearInterval(timeTimer);
+    
+    bgMusic.pause();
+
+    console.log("game over");
+}
+
 function decreaseTime()
 {
     if (seconds <= 0) {
-        clearInterval(drawTimer);
-        clearInterval(waveTimer);
-        clearInterval(timeTimer);
-        console.log("game over");
+       stopGame();
     }
     else {
         if (seconds % 2 === 0) {
