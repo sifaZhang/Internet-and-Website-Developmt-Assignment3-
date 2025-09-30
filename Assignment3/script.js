@@ -39,6 +39,7 @@ function start() {
 let myCanvas;
 let ctx;
 let balls = [];
+let tipBalls = [];
 let scoreTips = [];
 let totalScore = 0;
 let pickedBalls = 0;
@@ -125,7 +126,7 @@ class Hemisphere {
         this.radius = 20;
         this.x = parseInt(myCanvas.style.width);
         this.y = getRandomInt(310, parseInt(myCanvas.style.height) - this.radius);
-        this.type = getRandomInt(1, 3);
+        this.type = getRandomInt(1, typesOfTrash);
         this.speed = this.getSpeed();
         this.color = this.getRandomHexColor();
         this.score =  this.getScore();
@@ -211,17 +212,27 @@ function stopGame() {
 
     musicBg.pause();
 
-    //draw new items
-    ctx.fillStyle = "rgba(128, 128, 128, 0.5)"; // 半透明灰色
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    // 灰色半透明遮罩
+    ctx.fillStyle = "rgba(128, 128, 128, 0.5)";
+    ctx.fillRect(0, 0, parseInt(ctx.canvas.width), parseInt(ctx.canvas.height));
 
-    ctx.font = "28px Arial";
-    ctx.fillStyle = "black";
+    // 保存当前状态
+    ctx.save();
+
+    // 设置文字样式
+    ctx.font = "38px Arial Bold";
+    ctx.fillStyle = "white";
     ctx.textAlign = "center";
+
+    // 绘制文字
     const message = `Good effort! You picked ${pickedBalls} trashes and got ${totalScore} points`;
     ctx.fillText(message, parseInt(myCanvas.style.width) / 2, parseInt(myCanvas.style.height) / 2 - 100);
 
+    // 显示按钮
     replay.classList.remove('hidden');
+
+    // 恢复状态（可选）
+    ctx.restore();
 
     musicGoodjob.currentTime = 0; // rewind
     musicGoodjob.play();
@@ -358,6 +369,31 @@ function initGame() {
     );
     character.init();
 
+    //tip of trash
+    if(tipBalls.length === 0)
+    {
+        let ballA = new Hemisphere();
+        ballA.x = 890 + ballA.radius;
+        ballA.y = 10 + ballA.radius;
+        ballA.type = 1;
+        ballA.score = ballA.getScore(ballA.type);
+        tipBalls.push(ballA);
+
+        let ballB = new Hemisphere();
+        ballB.x = 890 + ballA.radius;
+        ballB.y = 40 + ballA.radius;
+        ballB.type = 2;
+        ballB.score = ballB.getScore(ballB.type);
+        tipBalls.push(ballB);
+
+        let ballC = new Hemisphere();
+        ballC.x = 890 + ballA.radius;
+        ballC.y = 70 + ballA.radius;
+        ballC.type = 3;
+        ballC.score = ballC.getScore(ballC.type);
+        tipBalls.push(ballC);
+    }
+
     // Event listeners
     document.addEventListener('keydown', doKeyDown);
     document.addEventListener('keyup', doKeyUp);
@@ -418,13 +454,18 @@ function drawTips()
 
 function drawTypesOfTrash()
 {
+    for(let i = 0; i < tipBalls.length; i++)
+    {
+        if(typesOfTrash > i) tipBalls[i].draw();
+    }
+    
     ctx.font = "18px Arial";
     ctx.fillStyle = "black";
     ctx.textAlign = "left";
 
-    ctx.fillText("A: 10", 940, 20);
-    if(typesOfTrash > 1) ctx.fillText("B: 20", 940, 40);
-    if(typesOfTrash > 2) ctx.fillText("C: 30", 940, 60);
+    ctx.fillText(": 10", 940, 20);
+    if(typesOfTrash > 1) ctx.fillText(": 20", 940, 50);
+    if(typesOfTrash > 2) ctx.fillText(": 30", 940, 80);
 }
 
 function drawBackground() {
