@@ -216,7 +216,7 @@ function stopGame() {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.font = "28px Arial";
-    ctx.fillStyle = "white";
+    ctx.fillStyle = "black";
     ctx.textAlign = "center";
     const message = `Good effort! You picked ${pickedBalls} trashes and got ${totalScore} points`;
     ctx.fillText(message, parseInt(myCanvas.style.width) / 2, parseInt(myCanvas.style.height) / 2 - 100);
@@ -266,7 +266,7 @@ function updateWave()
 
 function loadGame()
 {
-    characterSpriteSheet.src = "./assets/img/front.png";
+    characterSpriteSheet.src = "./assets/img/character.png";
     characterSpriteSheet.onload = load;
 
     // Background image
@@ -330,28 +330,28 @@ function initGame() {
 
         [ // main character set
             [ // walk up track
-                [0, 0], [64, 0], [128, 0] 
+                [0, 65], [64, 65], [128, 65] 
             ],
             [ // walk down track 
                 [0, 0], [64, 0], [128, 0]
             ],
             [ // walk left track
-                [0, 0], [64, 0], [128, 0]
+                [0, 129], [64, 129], [128, 129]
             ],
             [ // walk right track 
-                [0, 0], [64, 0], [128, 0]
+                [0, 193], [64, 193], [128, 193]
             ],
             [//up pick
-                [192, 0], [0, 0]
+                [192, 65], [256, 65]
             ],
             [//down pick
-                [192, 0], [0, 0]
+                [192, 0], [256, 0]
             ],
             [//left pick
-                [192, 0], [0, 0]
+                [192, 129], [256, 129]
             ],
             [//right pick
-                [192, 0], [0, 0]
+                [192, 193], [256, 193]
             ],
         ],
         scale // Sprite scaling factor
@@ -513,7 +513,7 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
         spriteScale: spriteScale,       // amount to scale sprites by (numbers except 1 will be linearly interpolated)
         spriteCanvasSize: spriteSize,   // Calculated size after scale. temp value set, overwritten in init
 
-        animationTrack: 0,              // current animation frame set to use
+        animationTrack: 3,              // current animation frame set to use
         animationFrame: 0,              // current frame in animation to draw
         frameTime: 125,                 // milliseconds to wait between animation frame updates
         timeSinceLastFrame: 0,          // track time since the last frame update was performed
@@ -599,6 +599,8 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                 musicNo.currentTime = 0; // rewind
                 musicNo.play();
             }
+
+            return pickSuccess;
         },
 
         // Handle actions for the character to perform.
@@ -615,25 +617,25 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                     this.animationTrack = 2;
                     this.animationFrame = 0;
                     this.direction[0] = - this.velocity;
-                    lastDirection = "moveLeft";
+                    this.lastDirection = "moveLeft";
                     break;
                 case "moveRight":
                     this.animationTrack = 3;
                     this.animationFrame = 0;
                     this.direction[0] = this.velocity;
-                    lastDirection = "moveRight";
+                    this.lastDirection = "moveRight";
                     break;
                 case "moveUp":
                     this.animationTrack = 0;
                     this.animationFrame = 0;
                     this.direction[1] = - this.velocity;
-                    lastDirection = "moveUp";
+                    this.lastDirection = "moveUp";
                     break;
                 case "moveDown":
                     this.animationTrack = 1;
                     this.animationFrame = 0;
                     this.direction[1] = this.velocity;
-                    lastDirection = "moveDown";
+                    this.lastDirection = "moveDown";
                     break;
                 case "noMoveHorizontal":
                     this.direction[0] = 0;
@@ -649,8 +651,17 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                     this.direction = [0, 0]; // 采集时角色静止
                     break;
                 case "noPick":
-                    this.animationTrack = this.getPickTrack() - 4; 
-                    this.collection();
+                    if(this.collection()) this.animationFrame = 1;
+                    else this.animationTrack = this.getPickTrack() - 4; 
+                    break;
+                case "doSprite":
+                    this.animationTrack = this.animationTrack >= 4 ? this.animationTrack : this.animationTrack + 4;
+                    this.animationFrame = 1;
+                    this.direction = [0, 0]; 
+                    break;
+                case "overSprite":
+                    this.animationTrack -= 4;
+                    this.animationFrame = 0;
                     break;
                 default:
                     this.direction = [0, 0];
@@ -731,6 +742,10 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                 case ' ':
                     if (isKeydown) this.action("pick");
                     else this.action("noPick");
+                    break;
+                case "Control":
+                    if (isKeydown) this.action("doSprite");
+                    else this.action("overSprite");
                     break;
                 default:
                     if (!isKeydown) this.action("stop");
