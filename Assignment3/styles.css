@@ -17,9 +17,23 @@ footer {
 }
 
 .hidden {
-    display: none;
+    display: none!important;
+}
+
+#canvas {
+    position: relative;
+    width: 1000px;
+    height: 666px;
 }
 
 #myCanvas {
     border: 2px solid #333;
+}
+
+#replay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10; /* 确保在最上层 */
 }

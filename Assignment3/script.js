@@ -1,6 +1,12 @@
+const replay = document.getElementById('replay');
 document.addEventListener("DOMContentLoaded", function () {
     console.log("ready");
     load();
+
+    replay.addEventListener('click', function (event) {
+        event.stopPropagation(); // 阻止冒泡
+        start(); // 重新播放动画
+    });
 });
 
 //page 1
@@ -33,19 +39,26 @@ function start() {
 let myCanvas;
 let ctx;
 let balls = [];
-let score = 0;
+let scoreTips = [];
+let totalScore = 0;
+let pickedBalls = 0;
 //background img
 let waveUp = true;
 const bg1 = new Image();
 const bg2 = new Image();
-const bgMusic = new Audio("./assets/audio/bg-music.mp3");
+const musicBg = new Audio("./assets/audio/bg-music.mp3");
+const musicNo = new Audio("./assets/audio/no.mp3");
+const musicBubble = new Audio("./assets/audio/bubble.mp3");
+const musicGoodjob = new Audio("./assets/audio/goodjob.mp3");
+const musicPeep = new Audio("./assets/audio/peep.mp3");
+const countdown = 5;
 const characterSpriteSheet = new Image();
 let bg;
 // game objects
 let character;
 let animationId;
 // set this to the number of elements you want to load before initalising
-const awaitLoadCount = 5;
+const awaitLoadCount = 9;
 let loadCount = 0;
 // time tracking
 let lastTimeStamp = 0;
@@ -71,90 +84,166 @@ function startGame() {
     waveTimer = setInterval(updateWave, 400);
     timeTimer = setInterval(decreaseTime, 1000);
 
-    bgMusic.play();
+    musicBg.play();
 }
 
 function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function getRandomHexColor() {
-  const hex = Math.floor(Math.random() * 0xffffff).toString(16);
-  return "#" + hex.padStart(6, "0");
-}
-
-function getSpeed(speed){
-    switch (speed) {
-        case 1:
-            return 0.1;
-        case 2:
-            return 0.2;
-        case 3:
-            return 0.3;
-        default:
-            return 0.1;
-    }
-}
-
-function getContrastColor(hex) {
-  // 去掉 # 号
-  hex = hex.replace("#", "");
-
-  // 解析 RGB 分量
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-
-  // 计算亮度（YIQ公式）
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-
-  // 返回黑或白
-  return yiq >= 128 ? "#000000" : "#ffffff";
-}
-
-class Hemisphere {
-  constructor() {
-    this.radius = 20;
-    this.x = parseInt(myCanvas.style.width);
-    this.y = getRandomInt(310, parseInt(myCanvas.style.height) - this.radius);
-    this.type = getRandomInt(1, 3);
-    this.speed = getSpeed(this.type);
-    this.color = getRandomHexColor();
+class ScorePopup {
+  constructor(x, y, score) {
+    this.x = x;
+    this.y = y;
+    this.score = score;
+    this.opacity = 1;
+    this.lifetime = 60; // 显示 60 帧（约 1 秒）
   }
 
   update() {
-    this.x -= this.speed;
+    this.y -= 0.5; // 向上漂浮
+    this.opacity -= 1 / this.lifetime;
+    this.lifetime--;
   }
 
   draw() {
-    const drawY = waveUp ? this.y - 5 : this.y;
-    const drawRadius = waveUp ? this.radius - 5 : this.radius;
+    ctx.save();
+    ctx.globalAlpha = this.opacity;
+    ctx.fillStyle = "red";
+    ctx.font = "20px Arial";
+    ctx.fillText(`+${this.score}`, this.x, this.y);
+    ctx.restore();
+  }
 
-    ctx.beginPath();
-    ctx.arc(this.x, drawY, drawRadius, Math.PI, 0);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.closePath();
-
-    ctx.font = "12px Arial";
-    ctx.fillStyle = getContrastColor(this.color);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    const letter = String.fromCharCode(64 + this.type);
-    ctx.fillText(letter, this.x, drawY - drawRadius / 2);
+  isExpired() {
+    return this.lifetime <= 0;
   }
 }
 
+class Hemisphere {
+    constructor() {
+        this.radius = 20;
+        this.x = parseInt(myCanvas.style.width);
+        this.y = getRandomInt(310, parseInt(myCanvas.style.height) - this.radius);
+        this.type = getRandomInt(1, 3);
+        this.speed = this.getSpeed();
+        this.color = this.getRandomHexColor();
+        this.score =  this.getScore();
+    }
+
+    update() {
+        this.x -= this.speed;
+    }
+
+    getSpeed() {
+         switch (this.type) {
+            case 1:
+                return 0.5;
+            case 2:
+                return 0.8;
+            case 3:
+                return 1;
+            default:
+                return 1;
+        }
+    }
+
+    getScore() {
+        switch (this.type) {
+            case 1:
+                return 10;
+            case 2:
+                return 20;
+            case 3:
+                return 30;
+            default:
+                return 10;
+        }
+    }
+
+    getRandomHexColor() {
+        const hex = Math.floor(Math.random() * 0xffffff).toString(16);
+        return "#" + hex.padStart(6, "0");
+    }
+
+    getContrastColor(hex) {
+        // 去掉 # 号
+        hex = hex.replace("#", "");
+
+        // 解析 RGB 分量
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+
+        // 计算亮度（YIQ公式）
+        const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+
+        // 返回黑或白
+        return yiq >= 128 ? "#000000" : "#ffffff";
+    }
+
+    draw() {
+        const drawY = waveUp ? this.y - 5 : this.y;
+        const drawRadius = waveUp ? this.radius - 5 : this.radius;
+
+        ctx.beginPath();
+        ctx.arc(this.x, drawY, drawRadius, Math.PI, 0);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.font = "12px Arial";
+        ctx.fillStyle = this.getContrastColor(this.color);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const letter = String.fromCharCode(64 + this.type);
+        ctx.fillText(letter, this.x, drawY - drawRadius / 2);
+    }
+}
+
 function stopGame() {
+    //stop animation
     clearInterval(waveTimer);
     clearInterval(timeTimer);
     
-    bgMusic.pause();
-
     cancelAnimationFrame(animationId);
 
+    musicBg.pause();
+
+    //draw new items
+    ctx.fillStyle = "rgba(128, 128, 128, 0.5)"; // 半透明灰色
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    ctx.font = "28px Arial";
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    const message = `Good effort! You picked ${pickedBalls} trashes and got ${totalScore} points`;
+    ctx.fillText(message, parseInt(myCanvas.style.width) / 2, parseInt(myCanvas.style.height) / 2 - 100);
+
+    replay.classList.remove('hidden');
+
+    musicGoodjob.currentTime = 0; // rewind
+    musicGoodjob.play();
+
     console.log("game over");
+}
+
+function createBall() {
+    if (seconds % 2 === 0) {
+        const ball = new Hemisphere();
+        balls.push(ball);
+
+        console.log("new ball");
+    }
+}
+
+function playPeep() {
+    if (seconds - 1 <= countdown) {
+        musicPeep.currentTime = 0; // rewind
+        musicBg.volume = 1;
+        musicPeep.play();
+    }
 }
 
 function decreaseTime()
@@ -163,12 +252,8 @@ function decreaseTime()
        stopGame();
     }
     else {
-        if (seconds % 2 === 0) {
-            const ball = new Hemisphere();
-            balls.push(ball);
-
-            console.log("new ball");
-        }
+        createBall();
+        playPeep();
     }
 
     seconds -= 1;
@@ -190,16 +275,46 @@ function loadGame()
     bg2.src = "./assets/img/background2.png"; 
     bg2.onload = load;
 
-    bgMusic.loop = true;
-    bgMusic.volume = 0.5;
-    bgMusic.addEventListener("canplaythrough", function () {
-        console.log("load music ok");
+    musicBg.loop = true;
+    musicBg.volume = 0.5;
+    musicBg.addEventListener("canplaythrough", function () {
+        console.log("background music ok");
+        load(); // 你的初始化函数
+    });
+
+    musicNo.addEventListener("canplaythrough", function () {
+        console.log("No music ok");
+        load(); // 你的初始化函数
+    });
+
+    musicBubble.addEventListener("canplaythrough", function () {
+        console.log("bubble music ok");
+        load(); // 你的初始化函数
+    });
+
+    musicGoodjob.addEventListener("canplaythrough", function () {
+        console.log("good job music ok");
+        load(); // 你的初始化函数
+    });
+
+    musicPeep.addEventListener("canplaythrough", function () {
+        console.log("peep music ok");
         load(); // 你的初始化函数
     });
 }
 
 function initGame() {
     console.log("init");
+
+    totalScore = 0;
+    pickedBalls = 0;
+    balls = [];
+    scoreTips = [];
+    waveUp = true;
+    lastTimeStamp = 0;
+    tick = 0;
+    replay.classList.add('hidden');
+    
     myCanvas = document.getElementById('myCanvas');
     ctx = myCanvas.getContext('2d');
     const scale = window.devicePixelRatio;
@@ -225,6 +340,18 @@ function initGame() {
             ],
             [ // walk right track 
                 [0, 0], [64, 0], [128, 0]
+            ],
+            [//up pick
+                [192, 0], [0, 0]
+            ],
+            [//down pick
+                [192, 0], [0, 0]
+            ],
+            [//left pick
+                [192, 0], [0, 0]
+            ],
+            [//right pick
+                [192, 0], [0, 0]
             ],
         ],
         scale // Sprite scaling factor
@@ -261,9 +388,22 @@ function updateBalls()
     }
 }
 
+function updateScoreTips()
+{
+     for (let i = scoreTips.length - 1; i >= 0; i--) {
+        if (scoreTips[i].isExpired()) {
+            scoreTips.splice(i, 1); // 删除当前元素
+            console.log("Delete tip");
+        } else {
+            scoreTips[i].update();  // 更新其状态
+        }
+    }
+}
+
 function updateElements(tick) {
     character.update(tick);
     updateBalls();
+    updateScoreTips();
 }
 
 function drawTips()
@@ -273,7 +413,7 @@ function drawTips()
     ctx.textAlign = "left";
 
     ctx.fillText("Time: " + seconds, 10, 20);
-    ctx.fillText("Score: " + score, 10, 40);
+    ctx.fillText("Score: " + totalScore, 10, 40);
 }
 
 function drawTypesOfTrash()
@@ -308,16 +448,37 @@ function drawBackground() {
   ctx.drawImage(bg, offsetX, offsetY, newWidth, newHeight);
 }
 
+function drawBalls() {
+    for (let i = 0; i < balls.length; i++) {
+        balls[i].draw();
+    }
+}
+
+function drawScoreTips() {
+    for (let i = 0; i < scoreTips.length; i++) {
+        scoreTips[i].draw();
+    }
+}
+
+function drawCountDown() {
+    if (seconds <= countdown) {
+        ctx.font = "150px Arial";
+        ctx.fillStyle = "red";
+        ctx.textAlign = "center";
+
+        ctx.fillText(seconds, parseInt(myCanvas.style.width) / 2, 120);
+    }
+}
+
 function drawCanvas() {
     ctx.clearRect(0, 0, myCanvas.width, myCanvas.height);
 
     drawBackground();
     drawTips();
     drawTypesOfTrash();
-
-    for (let i = 0; i < balls.length; i++) {
-        balls[i].draw();
-    }
+    drawBalls();
+    drawScoreTips();
+    drawCountDown();
 
     character.draw(ctx);
 }
@@ -357,10 +518,11 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
         frameTime: 125,                 // milliseconds to wait between animation frame updates
         timeSinceLastFrame: 0,          // track time since the last frame update was performed
         lastAction: "",                 // Last user input action performed
+        lastDirection: "moveRight",     // last direction
 
-        position: [0, 400],               // position of the character (X, Y)
-        direction: [0, 0],              // X and Y axis movement amount
-        velocity: 0.2,                   // rate of position change for each axis
+        position: [0, 400],              // position of the character (X, Y)
+        direction: [0, 0],               // X and Y axis movement amount
+        velocity: 0.1,                   // rate of position change for each axis
 
         // Initialise variables that cannot be calculated during
         // object creation.
@@ -371,6 +533,72 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                 this.spriteFrameSize[0] * this.spriteScale,
                 this.spriteFrameSize[1] * this.spriteScale
             ];
+        },
+
+        getPickTrack() {
+            let track = 7;
+            switch (this.lastDirection) {
+                case "moveLeft":
+                    track = 6;
+                    break;
+                case "moveRight":
+                    track = 7;
+                    break;
+                case "moveUp":
+                    track = 4;
+                    break;
+                case "moveDown":
+                    track = 5;
+                    break;
+                default:
+                    track = 7;
+                    break;
+            }
+
+            return track;
+        },
+
+        isColliding(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        },
+
+        collection() {
+            //in order to collect easily, expand the rectangle
+            const rc = { x: this.position[0], y: this.position[1], width: this.spriteCanvasSize[0] + 10, height: this.spriteCanvasSize[1] + 10 };
+
+            let pickSuccess = false;
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const rcBall = {
+                    x: balls[i].x - balls[i].radius,
+                    y: balls[i].y - balls[i].radius,
+                    width: balls[i].radius * 2,
+                    height: balls[i].radius,
+                };
+
+                if (this.isColliding(rc, rcBall)) {
+                    totalScore += balls[i].getScore();
+                    pickedBalls++;
+                    scoreTips.push(new ScorePopup(balls[i].x, balls[i].y - 80, balls[i].score));
+                    balls.splice(i, 1); // 删除当前元素
+                    console.log("pick ball");
+                    pickSuccess = true;
+                    break;
+                }
+            }
+
+            if (pickSuccess) {
+                musicBubble.currentTime = 0; // rewind
+                musicBubble.play();
+            }
+            else {
+                musicNo.currentTime = 0; // rewind
+                musicNo.play();
+            }
         },
 
         // Handle actions for the character to perform.
@@ -387,21 +615,25 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                     this.animationTrack = 2;
                     this.animationFrame = 0;
                     this.direction[0] = - this.velocity;
+                    lastDirection = "moveLeft";
                     break;
                 case "moveRight":
                     this.animationTrack = 3;
                     this.animationFrame = 0;
                     this.direction[0] = this.velocity;
+                    lastDirection = "moveRight";
                     break;
                 case "moveUp":
                     this.animationTrack = 0;
                     this.animationFrame = 0;
                     this.direction[1] = - this.velocity;
+                    lastDirection = "moveUp";
                     break;
                 case "moveDown":
                     this.animationTrack = 1;
                     this.animationFrame = 0;
                     this.direction[1] = this.velocity;
+                    lastDirection = "moveDown";
                     break;
                 case "noMoveHorizontal":
                     this.direction[0] = 0;
@@ -410,6 +642,15 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
                 case "noMoveVertical":
                     this.direction[1] = 0;
                     this.animationFrame = 0;
+                    break;
+                case "pick":
+                    this.animationTrack = this.getPickTrack(); 
+                    this.animationFrame = 0;
+                    this.direction = [0, 0]; // 采集时角色静止
+                    break;
+                case "noPick":
+                    this.animationTrack = this.getPickTrack() - 4; 
+                    this.collection();
                     break;
                 default:
                     this.direction = [0, 0];
@@ -468,20 +709,28 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
         doKeyInput(e, isKeydown = true) {
             switch (e) {
                 case "w":
+                case "ArrowUp":
                     if (isKeydown) this.action("moveUp");
                     else this.action("noMoveVertical");
                     break;
                 case "a":
+                case "ArrowLeft":
                     if (isKeydown) this.action("moveLeft");
                     else this.action("noMoveHorizontal");
                     break;
                 case "s":
+                case "ArrowDown":
                     if (isKeydown) this.action("moveDown");
                     else this.action("noMoveVertical");
                     break;
                 case "d":
+                case "ArrowRight":
                     if (isKeydown) this.action("moveRight");
                     else this.action("noMoveHorizontal");
+                    break;
+                case ' ':
+                    if (isKeydown) this.action("pick");
+                    else this.action("noPick");
                     break;
                 default:
                     if (!isKeydown) this.action("stop");
