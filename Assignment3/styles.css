@@ -22,12 +22,13 @@ footer {
 
 #canvas {
     position: relative;
-    width: 1000px;
-    height: 666px;
 }
 
 #myCanvas {
+    position: relative;
     border: 2px solid #333;
+    width: 1000px;
+    height: 666px;
 }
 
 #replay {
