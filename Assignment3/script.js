@@ -235,6 +235,8 @@ function stopGame() {
 
     musicBg.pause();
 
+    volumeSlider.disabled = true;
+
     // 灰色半透明遮罩
     ctx.fillStyle = "rgba(128, 128, 128, 0.5)";
     ctx.fillRect(0, 0, parseInt(ctx.canvas.width), parseInt(ctx.canvas.height));
@@ -357,6 +359,7 @@ function initGame() {
     lastTimeStamp = 0;
     tick = 0;
     replay.classList.add('hidden');
+    volumeSlider.disabled = false;
     
     myCanvas = document.getElementById('myCanvas');
     ctx = myCanvas.getContext('2d');
