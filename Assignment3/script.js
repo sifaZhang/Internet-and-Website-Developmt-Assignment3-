@@ -34,6 +34,14 @@ function start() {
     }
 }
 
+function wireframe() {
+    window.open("assets/wireFrame/wireFrame task 2.pdf", "_blank");
+}
+
+function storyboards() {
+    window.open("assets/storyBoard/Storyboard task 2.pdf", "_blank");
+}
+
 
 //page 2
 let myCanvas;
@@ -561,7 +569,7 @@ function Character(spritesheet, spriteSize, spriteFrames, spriteScale) {
         lastAction: "",                 // Last user input action performed
         lastDirection: "moveRight",     // last direction
 
-        position: [0, 400],              // position of the character (X, Y)
+        position: [450, 400],            // position of the character (X, Y)
         direction: [0, 0],               // X and Y axis movement amount
         velocity: 0.1,                   // rate of position change for each axis
 

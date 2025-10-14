@@ -38,3 +38,14 @@ footer {
   transform: translate(-50%, -50%);
   z-index: 10; /* 确保在最上层 */
 }
+
+#btnStart {
+    width: 100px;
+}
+
+#startDiv {
+    margin-top: 50px;
+}
+#docment {
+    margin-top: 100px;
+}
