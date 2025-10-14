@@ -74,6 +74,19 @@ let lastTimeStamp = 0;
 let tick = 0;
 //load result
 let Loaded = false;    
+const volumeSlider = document.getElementById("volumeControl");
+
+function setVolume(vulume){
+    musicBg.volume = parseFloat(vulume);
+    musicNo.volume = parseFloat(vulume);
+    musicBubble.volume = parseFloat(vulume);
+    musicGoodjob.volume = parseFloat(vulume);
+    musicPeep.volume = parseFloat(vulume);
+}
+
+volumeSlider.addEventListener("input", function () {
+    setVolume(this.value);
+});
 
 // call this function after each loadable element has finished loading.
 // Once all elements are loaded, loadCount threshold will be met to init.
@@ -92,6 +105,8 @@ function startGame() {
 
     waveTimer = setInterval(updateWave, 400);
     timeTimer = setInterval(decreaseTime, 1000);
+
+    startSpawning();
 
     musicBg.play();
 }
@@ -248,19 +263,28 @@ function stopGame() {
     console.log("game over");
 }
 
-function createBall() {
-    if (seconds % 2 === 0) {
-        const ball = new Hemisphere();
-        balls.push(ball);
-
-        console.log("new ball");
+function startSpawning() {
+    function scheduleNextSpawn() {
+        const delay = Math.random() * 500 + 500; // 500ms–1000ms
+        setTimeout(() => {
+            createBall();
+            scheduleNextSpawn();
+        }, delay);
     }
+
+    scheduleNextSpawn();
+}
+
+function createBall() {
+    const ball = new Hemisphere();
+    balls.push(ball);
+
+    console.log("new ball");
 }
 
 function playPeep() {
     if (seconds - 1 <= countdown) {
         musicPeep.currentTime = 0; // rewind
-        musicBg.volume = 1;
         musicPeep.play();
     }
 }
@@ -271,7 +295,6 @@ function decreaseTime()
        stopGame();
     }
     else {
-        createBall();
         playPeep();
     }
 
@@ -295,7 +318,6 @@ function loadGame()
     bg2.onload = load;
 
     musicBg.loop = true;
-    musicBg.volume = 0.5;
     musicBg.addEventListener("canplaythrough", function () {
         console.log("background music ok");
         load(); // 你的初始化函数
@@ -320,6 +342,8 @@ function loadGame()
         console.log("peep music ok");
         load(); // 你的初始化函数
     });
+
+    setVolume(0.5);
 }
 
 function initGame() {

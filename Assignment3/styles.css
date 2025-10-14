@@ -46,6 +46,14 @@ footer {
 #startDiv {
     margin-top: 50px;
 }
+
 #docment {
     margin-top: 100px;
+}
+
+#controlbolume {
+    position: absolute;
+    top: 3%;
+    left: 40%;
+    font: 18px Arial bold black;
 }
