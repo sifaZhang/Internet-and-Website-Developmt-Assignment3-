@@ -267,13 +267,14 @@ function stopGame() {
 
 function startSpawning() {
     function scheduleNextSpawn() {
-        const delay = Math.random() * 500 + 500; // 500ms–1000ms
+        const delay = Math.random() * 1000 + 1000; // 1000ms–2000ms
         setTimeout(() => {
             createBall();
             scheduleNextSpawn();
         }, delay);
     }
 
+    createBall();
     scheduleNextSpawn();
 }
 
