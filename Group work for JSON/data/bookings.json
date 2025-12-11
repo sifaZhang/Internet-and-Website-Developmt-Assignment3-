@@ -1,0 +1,20 @@
+{
+  "bookings": [
+    {
+      "id": 4,
+      "name": "Sifa zhang",
+      "partySize": 1,
+      "tourId": 2,
+      "time": "10:00",
+      "operator": "Harbour Cruises"
+    },
+    {
+      "id": 5,
+      "name": "Sifa zhang",
+      "partySize": 1,
+      "tourId": 2,
+      "time": "10:00",
+      "operator": "Harbour Cruises"
+    }
+  ]
+}

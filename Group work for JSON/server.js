@@ -9,8 +9,8 @@ import xml2js from "xml2js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const xmlPath = path.join(__dirname, "data//tours.xml");
-const bookingsXmlPath = path.join(__dirname, "data//bookings.xml");
+const toursJsonPath = path.join(__dirname, "data", "tours.json");
+const bookingsJsonPath = path.join(__dirname, "data", "bookings.json");
 
 const app = express();
 const PORT = 3000;
@@ -24,118 +24,90 @@ let tours = [];
 let bookings = [];
 let bookingIdCounter = 0;
 
-
-function loadToursFromXML() {
-  if (!fs.existsSync(xmlPath)) {
-    console.error("tours.xml not found at", xmlPath);
+function loadBookingsFromJSON() {
+  if (!fs.existsSync(bookingsJsonPath)) {
+    console.warn("bookings.json not found at", bookingsJsonPath);
     return;
   }
 
-  const xml = fs.readFileSync(xmlPath, "utf-8");
+  try {
+    const json = fs.readFileSync(bookingsJsonPath, "utf-8");
+    const result = JSON.parse(json);
 
-  xml2js.parseString(xml, { explicitArray: false }, (err, result) => {
-    if (err) {
-      console.error("Error parsing tours.xml:", err);
-      return;
-    }
+    const bookingList = Array.isArray(result.bookings) ? result.bookings : [];
 
-    try {
-      const rawTours = result.tours?.tour || [];
-      const tourList = Array.isArray(rawTours) ? rawTours : [rawTours];
+    bookings = bookingList.map((b) => ({
+      id: parseInt(b.id),
+      name: b.name || "",
+      partySize: parseInt(b.partySize) || 0,
+      tourId: parseInt(b.tourId),
+      time: b.time || "",
+      operator: b.operator || "",
+    }));
 
-      tours = tourList.map((t) => {
-        const launchesRaw = t.launches?.launch || [];
-        const launchList = Array.isArray(launchesRaw) ? launchesRaw : [launchesRaw];
+    bookings.forEach((booking) => {
+      if (booking.id > bookingIdCounter) bookingIdCounter = booking.id;
+    });
 
-        return {
-          id: parseInt(t.id),
-          operator: t.operator,
-          price: parseFloat(t.price),
-          image: t.image,
-          location: {
-            lat: parseFloat(t.location.lat),
-            lng: parseFloat(t.location.lng),
-          },
-          launches: launchList.map((l) => ({
-            time: l.time,
-            capacity: parseInt(l.capacity),
-          })),
-        };
-      });
-
-      console.log("Loaded tours from XML:", tours.length, "tours");
-    } catch (e) {
-      console.error("Error processing tours data:", e);
-    }
-  });
+    console.log("Loaded bookings from JSON:", bookings.length, "records");
+  } catch (e) {
+    console.error("Error parsing bookings.json:", e);
+  }
 }
 
-function saveToursToXML() {
-  const builder = new xml2js.Builder();
+function saveBookingsToJSON() {
+  try {
+    const data = { bookings: bookings };
+    fs.writeFileSync(bookingsJsonPath, JSON.stringify(data, null, 2), "utf-8");
+    console.log("Bookings saved to JSON file.");
+  } catch (e) {
+    console.error("Error saving bookings.json:", e);
+  }
+}
 
-  const toursToSave = tours.map(t => ({
-    id: t.id,
-    operator: t.operator,
-    price: t.price,
-    image: t.image,
-    location: {
-      lat: t.location.lat,
-      lng: t.location.lng
-    },
-    launches: {
-      launch: t.launches.map(l => ({
+
+function loadToursFromJSON() {
+  if (!fs.existsSync(toursJsonPath)) {
+    console.error("tours.json not found at", toursJsonPath);
+    return;
+  }
+
+  try {
+    const json = fs.readFileSync(toursJsonPath, "utf-8");
+    const result = JSON.parse(json);
+
+    const rawTours = result.tours || [];
+    const tourList = Array.isArray(rawTours) ? rawTours : [rawTours];
+
+    tours = tourList.map((t) => ({
+      id: parseInt(t.id),
+      operator: t.operator,
+      price: parseFloat(t.price),
+      image: t.image,
+      location: {
+        lat: parseFloat(t.location.lat),
+        lng: parseFloat(t.location.lng),
+      },
+      launches: (t.launches || []).map((l) => ({
         time: l.time,
-        capacity: l.capacity
-      }))
-    }
-  }));
+        capacity: parseInt(l.capacity),
+      })),
+    }));
 
-  const xml = builder.buildObject({ tours: { tour: toursToSave } });
-  fs.writeFileSync(xmlPath, xml);
-}
-
-function loadBookingsFromXML() {
-  if (!fs.existsSync(bookingsXmlPath)) {
-    console.warn("bookings.xml not found at", bookingsXmlPath);
-    return;
+    console.log("Loaded tours from JSON:", tours.length, "tours");
+  } catch (e) {
+    console.error("Error parsing tours.json:", e);
   }
-
-  const xml = fs.readFileSync(bookingsXmlPath, "utf-8");
-
-  xml2js.parseString(xml, { explicitArray: false }, (err, result) => {
-    if (err) {
-      console.error("Error parsing bookings.xml:", err);
-      return;
-    }
-
-    try {
-      const raw = result.bookings?.booking;
-      const bookingList = Array.isArray(raw) ? raw : raw ? [raw] : [];
-
-      bookings = bookingList.map((b) => ({
-        id: parseInt(b.id),
-        name: b.name || "",
-        partySize: parseInt(b.partySize) || 0,
-        tourId: parseInt(b.tourId),
-        time: b.time || "",
-        operator: b.operator || "",
-      }));
-
-      bookings.forEach((booking) => {
-        if (booking.id > bookingIdCounter) bookingIdCounter = booking.id;
-      });
-
-      console.log("Loaded bookings from XML:", bookings.length, "records");
-    } catch (e) {
-      console.error("Error processing bookings data:", e);
-    }
-  });
 }
 
-function saveBookingsToXML() {
-  const builder = new xml2js.Builder();
-  const xml = builder.buildObject({ bookings: { booking: bookings } });
-  fs.writeFileSync(bookingsXmlPath, xml);
+function saveToursToJSON() {
+  try {
+    const data = { tours: tours };
+    fs.writeFileSync(toursJsonPath, JSON.stringify(data, null, 2), "utf-8");
+    console.log("Tours saved to JSON file.");
+  } catch (e) {
+    console.error("Error saving tours.json:", e);
+  }
 }
 
 
@@ -162,7 +134,7 @@ app.post("/api/bookings", (req, res) => {
   }
 
   launch.capacity -= partySize;
-  saveToursToXML();
+  saveToursToJSON();
 
   const newBooking = {
     id: ++bookingIdCounter,
@@ -174,7 +146,7 @@ app.post("/api/bookings", (req, res) => {
   };
 
   bookings.push(newBooking);
-  saveBookingsToXML();
+  saveBookingsToJSON();
 
   res.status(201).json(newBooking);
 });
@@ -199,16 +171,16 @@ app.delete("/api/bookings/:id", (req, res) => {
 
   bookings.splice(bookingIndex, 1);
 
-  saveToursToXML();
-  saveBookingsToXML();
+  saveToursToJSON();
+  saveBookingsToJSON();
 
   res.json({ message: "Booking cancelled", ...booking });
 });
 
 
 
-loadBookingsFromXML();
-loadToursFromXML();
+loadBookingsFromJSON();
+loadToursFromJSON();
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
