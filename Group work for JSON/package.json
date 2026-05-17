@@ -11,7 +11,7 @@
   "license": "ISC",
   "type": "module",
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
