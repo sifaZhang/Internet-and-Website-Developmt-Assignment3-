@@ -5,81 +5,38 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import fs from "fs";
-import xml2js from "xml2js";
+import { Redis } from "@upstash/redis";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const toursJsonPath = path.join(__dirname, "data", "tours.json");
-const bookingsJsonPath = path.join(__dirname, "data", "bookings.json");
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public"))); 
+app.use(express.static(path.join(__dirname, "public")));
 
+// 初始化 Redis（自动读取环境变量 KV_REST_API_URL 和 KV_REST_API_TOKEN）
+const redis = Redis.fromEnv();
 
 let tours = [];
 let bookings = [];
 let bookingIdCounter = 0;
 
-function loadBookingsFromJSON() {
-  if (!fs.existsSync(bookingsJsonPath)) {
-    console.warn("bookings.json not found at", bookingsJsonPath);
-    return;
-  }
-
-  try {
-    const json = fs.readFileSync(bookingsJsonPath, "utf-8");
-    const result = JSON.parse(json);
-
-    const bookingList = Array.isArray(result.bookings) ? result.bookings : [];
-
-    bookings = bookingList.map((b) => ({
-      id: parseInt(b.id),
-      name: b.name || "",
-      partySize: parseInt(b.partySize) || 0,
-      tourId: parseInt(b.tourId),
-      time: b.time || "",
-      operator: b.operator || "",
-    }));
-
-    bookings.forEach((booking) => {
-      if (booking.id > bookingIdCounter) bookingIdCounter = booking.id;
-    });
-
-    console.log("Loaded bookings from JSON:", bookings.length, "records");
-  } catch (e) {
-    console.error("Error parsing bookings.json:", e);
-  }
-}
-
-function saveBookingsToJSON() {
-  try {
-    const data = { bookings: bookings };
-    fs.writeFileSync(bookingsJsonPath, JSON.stringify(data, null, 2), "utf-8");
-    console.log("Bookings saved to JSON file.");
-  } catch (e) {
-    console.error("Error saving bookings.json:", e);
-  }
-}
-
-
-function loadToursFromJSON() {
-  if (!fs.existsSync(toursJsonPath)) {
-    console.error("tours.json not found at", toursJsonPath);
-    return;
-  }
-
-  try {
+// ========== 初始化 Tours ==========
+async function initTours() {
+  const cached = await redis.get("tours");
+  if (cached) {
+    tours = cached;
+    console.log("Loaded tours from Redis:", tours.length);
+  } else {
+    // 第一次从 JSON 文件读取，存入 Redis
     const json = fs.readFileSync(toursJsonPath, "utf-8");
     const result = JSON.parse(json);
-
     const rawTours = result.tours || [];
-    const tourList = Array.isArray(rawTours) ? rawTours : [rawTours];
-
-    tours = tourList.map((t) => ({
+    tours = (Array.isArray(rawTours) ? rawTours : [rawTours]).map((t) => ({
       id: parseInt(t.id),
       operator: t.operator,
       price: parseFloat(t.price),
@@ -93,31 +50,45 @@ function loadToursFromJSON() {
         capacity: parseInt(l.capacity),
       })),
     }));
-
-    console.log("Loaded tours from JSON:", tours.length, "tours");
-  } catch (e) {
-    console.error("Error parsing tours.json:", e);
+    await redis.set("tours", tours);
+    console.log("Tours initialized to Redis:", tours.length);
   }
 }
 
-function saveToursToJSON() {
-  try {
-    const data = { tours: tours };
-    fs.writeFileSync(toursJsonPath, JSON.stringify(data, null, 2), "utf-8");
-    console.log("Tours saved to JSON file.");
-  } catch (e) {
-    console.error("Error saving tours.json:", e);
+// ========== 初始化 Bookings ==========
+async function initBookings() {
+  const cached = await redis.get("bookings");
+  if (cached) {
+    bookings = cached;
+    bookings.forEach((b) => {
+      if (b.id > bookingIdCounter) bookingIdCounter = b.id;
+    });
+    console.log("Loaded bookings from Redis:", bookings.length);
+  } else {
+    bookings = [];
+    await redis.set("bookings", bookings);
+    console.log("Bookings initialized empty in Redis");
   }
 }
 
+// ========== 保存到 Redis ==========
+async function saveTours() {
+  await redis.set("tours", tours);
+}
+
+async function saveBookings() {
+  await redis.set("bookings", bookings);
+  await redis.set("bookingIdCounter", bookingIdCounter);
+}
+
+// ========== API 路由 ==========
 
 app.get("/api/tours", (req, res) => {
-  console.log("get ", tours.length, "tours");
+  console.log("get", tours.length, "tours");
   res.json(tours);
 });
 
-
-app.post("/api/bookings", (req, res) => {
+app.post("/api/bookings", async (req, res) => {
   const { name, partySize, tourId, time } = req.body;
   if (!name || !partySize || !tourId || !time) {
     return res.status(400).json({ error: "Missing booking data" });
@@ -134,7 +105,7 @@ app.post("/api/bookings", (req, res) => {
   }
 
   launch.capacity -= partySize;
-  saveToursToJSON();
+  await saveTours();
 
   const newBooking = {
     id: ++bookingIdCounter,
@@ -146,11 +117,10 @@ app.post("/api/bookings", (req, res) => {
   };
 
   bookings.push(newBooking);
-  saveBookingsToJSON();
+  await saveBookings();
 
   res.status(201).json(newBooking);
 });
-
 
 app.get("/api/bookings/:id", (req, res) => {
   const booking = bookings.find((b) => b.id === parseInt(req.params.id));
@@ -158,30 +128,38 @@ app.get("/api/bookings/:id", (req, res) => {
   res.json(booking);
 });
 
-
-app.delete("/api/bookings/:id", (req, res) => {
-  const bookingIndex = bookings.findIndex((b) => b.id === parseInt(req.params.id));
-  if (bookingIndex === -1) return res.status(404).json({ error: "Booking not found" });
+app.delete("/api/bookings/:id", async (req, res) => {
+  const bookingIndex = bookings.findIndex(
+    (b) => b.id === parseInt(req.params.id)
+  );
+  if (bookingIndex === -1)
+    return res.status(404).json({ error: "Booking not found" });
 
   const booking = bookings[bookingIndex];
-
   const tour = tours.find((t) => t.id === booking.tourId);
   const launch = tour.launches.find((l) => l.time === booking.time);
   launch.capacity += booking.partySize;
 
   bookings.splice(bookingIndex, 1);
 
-  saveToursToJSON();
-  saveBookingsToJSON();
+  await saveTours();
+  await saveBookings();
 
   res.json({ message: "Booking cancelled", ...booking });
 });
 
+// ========== 启动 ==========
+async function start() {
+  await initTours();
+  await initBookings();
 
+  if (process.env.NODE_ENV !== "production") {
+    app.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  }
+}
 
-loadBookingsFromJSON();
-loadToursFromJSON();
+start();
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+export default app;
